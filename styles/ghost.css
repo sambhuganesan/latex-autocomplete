@@ -1,0 +1,37 @@
+/* ghost.css — ghost text overlay styles */
+
+#latex-ghost-overlay {
+  /* Hidden by default; shown via .visible class */
+  display: none;
+
+  position: absolute;
+  z-index: 2147483647; /* max z-index */
+  pointer-events: none;
+  user-select: none;
+
+  /* Ghost appearance */
+  color: #888;
+  opacity: 0.6;
+  font-style: italic;
+
+  /* Prevent layout interference */
+  white-space: nowrap;
+  padding: 0 2px;
+  border-radius: 2px;
+  background: transparent;
+
+  /* Match typical code editor font; actual font will be overridden at show time
+     if we can read it from the editor element */
+  font-family: monospace;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+#latex-ghost-overlay.visible {
+  display: block;
+}
+
+/* Subtle hint styling — looks like Copilot-style ghost text */
+#latex-ghost-overlay::before {
+  content: ' ';
+}

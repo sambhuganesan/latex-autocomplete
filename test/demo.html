@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>LaTeX Auto-Compute — Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1e1e2e;
+      color: #cdd6f4;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    h1 { font-size: 20px; margin-bottom: 4px; color: #cba6f7; }
+    .subtitle {
+      font-size: 13px;
+      color: #6c7086;
+      margin-bottom: 28px;
+    }
+
+    .editor-card {
+      width: 100%;
+      max-width: 680px;
+      background: #181825;
+      border: 1px solid #313244;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .editor-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: #11111b;
+      border-bottom: 1px solid #313244;
+      font-size: 12px;
+      color: #6c7086;
+    }
+
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot.r { background: #f38ba8; } .dot.y { background: #f9e2af; } .dot.g { background: #a6e3a1; }
+
+    textarea#editor {
+      display: block;
+      width: 100%;
+      min-height: 160px;
+      background: #181825;
+      color: #cdd6f4;
+      font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.7;
+      padding: 16px 18px;
+      border: none;
+      resize: vertical;
+      outline: none;
+      caret-color: #cba6f7;
+    }
+
+    /* Ghost text overlay — floats on top of the textarea at the caret */
+    #ghost {
+      position: absolute;
+      pointer-events: none;
+      white-space: pre;
+      color: #6c7086;
+      font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.7;
+      padding: 0;
+      display: none;
+      z-index: 9999;
+    }
+
+    .hint-bar {
+      padding: 8px 14px;
+      background: #11111b;
+      border-top: 1px solid #313244;
+      font-size: 12px;
+      color: #6c7086;
+      display: flex;
+      gap: 16px;
+    }
+
+    kbd {
+      background: #313244;
+      color: #cdd6f4;
+      border: 1px solid #45475a;
+      border-radius: 3px;
+      padding: 1px 6px;
+      font-size: 11px;
+      font-family: monospace;
+    }
+
+    /* Example pills */
+    .examples {
+      width: 100%;
+      max-width: 680px;
+      margin-bottom: 20px;
+    }
+
+    .examples h2 {
+      font-size: 13px;
+      color: #6c7086;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+    }
+
+    .pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pill {
+      background: #181825;
+      border: 1px solid #313244;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 12px;
+      color: #89b4fa;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      user-select: none;
+    }
+    .pill:hover { border-color: #89b4fa; background: #1e1e2e; }
+
+    /* Status line */
+    #status {
+      font-size: 12px;
+      color: #6c7086;
+      min-height: 18px;
+      margin-bottom: 12px;
+      width: 100%;
+      max-width: 680px;
+    }
+    #status.ok  { color: #a6e3a1; }
+    #status.err { color: #f38ba8; }
+  </style>
+</head>
+<body>
+
+<h1>∑ LaTeX Auto-Compute</h1>
+<p class="subtitle">Type inside <code style="color:#89b4fa">$...$</code> or <code style="color:#89b4fa">\[...\]</code> and end with <code style="color:#f9e2af">=</code></p>
+
+<div id="status"></div>
+
+<div class="editor-card">
+  <div class="editor-header">
+    <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+    <span style="margin-left:6px">editor</span>
+  </div>
+  <textarea id="editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">$\binom{10}{5} \cdot 5! - 82 \cdot \frac{1}{2} =</textarea>
+  <div class="hint-bar">
+    <span><kbd>Tab</kbd> accept</span>
+    <span><kbd>↑</kbd><kbd>↓</kbd> cycle formats</span>
+    <span><kbd>Esc</kbd> dismiss</span>
+  </div>
+</div>
+
+<div id="ghost"></div>
+
+<div class="examples">
+  <h2>Click to try</h2>
+  <div class="pills" id="pills"></div>
+</div>
+
+<script src="../src/parser.js"></script>
+<script src="../src/compute.js"></script>
+<script>
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+// Forward-scan: find open math region and return content before trailing '='
+function extractMath(text) {
+  let inMath = false, start = -1, i = 0;
+  while (i < text.length) {
+    if (text[i] === '\\' && i + 1 < text.length) {
+      const n = text[i + 1];
+      if (n === '[' || n === '(') { if (!inMath) { inMath = true; start = i + 2; } i += 2; continue; }
+      if (n === ']' || n === ')') { if (inMath)  { inMath = false; start = -1; } i += 2; continue; }
+      i += 2; continue;
+    }
+    if (text[i] === '$') {
+      if (i + 1 < text.length && text[i + 1] === '$') {
+        inMath = !inMath; start = inMath ? i + 2 : -1; i += 2;
+      } else {
+        inMath = !inMath; start = inMath ? i + 1 : -1; i++;
+      }
+      continue;
+    }
+    i++;
+  }
+  if (!inMath || start < 0) return null;
+  let content = text.slice(start).trimEnd();
+  if (!content.endsWith('=')) return null;
+  return content.slice(0, -1).trim() || null;
+}
+
+// Get caret (x, y) in viewport coords using mirror-div technique
+function getCaretViewportPos(ta) {
+  const pos  = ta.selectionEnd;
+  const comp = window.getComputedStyle(ta);
+
+  const m = document.createElement('div');
+  m.style.cssText = [
+    'position:fixed', 'top:-9999px', 'left:-9999px',
+    'visibility:hidden', 'white-space:pre-wrap', 'word-wrap:break-word',
+    'overflow:hidden',
+    'box-sizing:'    + comp.boxSizing,
+    'width:'         + comp.width,
+    'padding:'       + comp.padding,
+    'border:'        + comp.border,
+    'font-family:'   + comp.fontFamily,
+    'font-size:'     + comp.fontSize,
+    'font-weight:'   + comp.fontWeight,
+    'font-style:'    + comp.fontStyle,
+    'line-height:'   + comp.lineHeight,
+    'letter-spacing:'+ comp.letterSpacing,
+    'tab-size:'      + comp.tabSize,
+  ].join(';');
+
+  m.textContent = ta.value.slice(0, pos);
+  const caret = document.createElement('span');
+  caret.textContent = '\u200b';  // zero-width space marks the caret
+  m.appendChild(caret);
+  document.body.appendChild(m);
+
+  const mr = m.getBoundingClientRect();
+  const cr = caret.getBoundingClientRect();
+  document.body.removeChild(m);
+
+  const tr = ta.getBoundingClientRect();
+  return {
+    x: tr.left + (cr.left - mr.left) - ta.scrollLeft + ta.clientLeft,
+    y: tr.top  + (cr.top  - mr.top)  - ta.scrollTop  + ta.clientTop,
+    h: cr.height || parseFloat(comp.lineHeight) || 20,
+  };
+}
+
+// ─── ghost state ─────────────────────────────────────────────────────────────
+
+const editor   = document.getElementById('editor');
+const ghost    = document.getElementById('ghost');
+const statusEl = document.getElementById('status');
+let ghostVisible = false;
+let ghostForms   = [];   // all available representations
+let ghostIndex   = 0;    // which one is currently shown
+
+function currentForm() { return ghostForms[ghostIndex] || ''; }
+
+function renderGhost() {
+  const text = currentForm();
+  const hint = ghostForms.length > 1
+    ? `  ↑↓ (${ghostIndex + 1}/${ghostForms.length})`
+    : '';
+  ghost.textContent = text + hint;
+  const label = ghostForms.length > 1
+    ? `= ${text}  —  Tab accept · ↑↓ cycle formats`
+    : `= ${text}  —  Tab to accept`;
+  setStatus(label, 'ok');
+}
+
+function showGhost(forms, x, y, h) {
+  ghostForms  = forms;
+  ghostIndex  = 0;
+
+  ghost.style.left       = (x + window.scrollX) + 'px';
+  ghost.style.top        = (y + window.scrollY) + 'px';
+  ghost.style.lineHeight = h + 'px';
+  ghost.style.display    = 'block';
+  ghost.style.fontSize   = window.getComputedStyle(editor).fontSize;
+  ghost.style.fontFamily = window.getComputedStyle(editor).fontFamily;
+  ghostVisible = true;
+  renderGhost();
+}
+
+function hideGhost() {
+  ghost.style.display = 'none';
+  ghostVisible = false;
+  ghostForms   = [];
+  ghostIndex   = 0;
+  setStatus('');
+}
+
+function setStatus(msg, cls = '') {
+  statusEl.textContent = msg;
+  statusEl.className   = cls;
+}
+
+// ─── accept / dismiss ────────────────────────────────────────────────────────
+
+function accept() {
+  const text = currentForm();
+  hideGhost();
+  if (!text) return;
+
+  const end = editor.selectionEnd;
+  editor.value = editor.value.slice(0, end) + text + editor.value.slice(end);
+  editor.selectionStart = editor.selectionEnd = end + text.length;
+  setStatus('Inserted: ' + text, 'ok');
+}
+
+// ─── keydown — capture phase intercepts before Tab moves focus ───────────────
+
+document.addEventListener('keydown', (e) => {
+  if (!ghostVisible) return;
+
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    accept();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    ghostIndex = (ghostIndex - 1 + ghostForms.length) % ghostForms.length;
+    renderGhost();
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    ghostIndex = (ghostIndex + 1) % ghostForms.length;
+    renderGhost();
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    hideGhost();
+  } else if (!['Shift','Control','Alt','Meta','CapsLock'].includes(e.key)) {
+    hideGhost(); // let keystroke through
+  }
+}, { capture: true });
+
+// ─── input handler ───────────────────────────────────────────────────────────
+
+editor.addEventListener('input', () => {
+  // Get text up to cursor
+  const text = editor.value.slice(0, editor.selectionEnd);
+
+  if (!text.trimEnd().endsWith('=')) {
+    if (ghostVisible) hideGhost();
+    return;
+  }
+
+  // Check nothing already follows '=' except a closing math delimiter
+  const rest = editor.value.slice(editor.selectionEnd);
+  const restLine = rest.split('\n')[0].trim();
+  // $, $$, \], \) are closing delimiters — not an answer
+  const restWithoutDelim = restLine.replace(/^(\$\$|\$|\\\]|\\\))\s*/, '');
+  if (restWithoutDelim.length > 0) {
+    if (ghostVisible) hideGhost();
+    return;
+  }
+
+  const expr = extractMath(text);
+  if (!expr) { if (ghostVisible) hideGhost(); return; }
+
+  let result;
+  try {
+    const ast = parse(expr);
+    result = compute(ast, 'auto');
+  } catch (e) {
+    hideGhost(); return;
+  }
+  if (!result.success) { hideGhost(); return; }
+
+  const forms = getAllFormats(result.value);
+  if (forms.length === 0) { hideGhost(); return; }
+
+  const pos = getCaretViewportPos(editor);
+  showGhost(forms, pos.x, pos.y, pos.h);
+});
+
+// Also hide ghost when editor loses focus
+editor.addEventListener('blur', hideGhost);
+
+// ─── example pills ───────────────────────────────────────────────────────────
+
+const EXAMPLES = [
+  '$\\binom{10}{5} \\cdot 5! - 82 \\cdot \\frac{1}{2} =',
+  '$\\frac{3}{4} + \\frac{1}{8} =',
+  '$2^{10} - 1 =',
+  '$\\sqrt{144} =',
+  '$5! + 3! =',
+  // irrational exact forms — press ↑↓ after these appear
+  '$\\arctan(1) =',          // π/4
+  '$\\sin(\\pi / 6) =',      // 1/2  but also try ↑ for exact
+  '$\\sin(\\pi / 4) =',      // √2/2
+  '$\\cos(\\pi / 6) =',      // √3/2
+  '$\\sqrt{2} =',            // √2
+  '$\\sqrt{3} =',            // √3
+  '$2 \\cdot \\pi =',        // 2π
+  '$\\log(100) =',
+  '$\\ln(e) =',
+  '$\\sqrt[3]{27} =',
+  '$\\binom{6}{3} =',
+  '$10! =',
+];
+
+const pillsEl = document.getElementById('pills');
+EXAMPLES.forEach(ex => {
+  const p = document.createElement('div');
+  p.className = 'pill';
+  p.textContent = ex;
+  p.addEventListener('click', () => {
+    editor.value = ex;
+    editor.focus();
+    editor.selectionStart = editor.selectionEnd = ex.length;
+    editor.dispatchEvent(new Event('input'));
+  });
+  pillsEl.appendChild(p);
+});
+
+// Trigger on the initial content
+editor.dispatchEvent(new Event('input'));
+</script>
+</body>
+</html>

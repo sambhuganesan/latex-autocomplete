@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LaTeX Auto-Compute</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <span class="logo">∑</span>
+    <h1>LaTeX Auto-Compute</h1>
+  </div>
+
+  <div class="section">
+    <label class="row" for="enabled-toggle">
+      <span class="label">Enable</span>
+      <label class="switch">
+        <input type="checkbox" id="enabled-toggle">
+        <span class="slider"></span>
+      </label>
+    </label>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Output format</div>
+    <label class="radio-row">
+      <input type="radio" name="format" value="auto" id="fmt-auto">
+      <span>Auto <span class="hint">(fractions when clean, else decimal)</span></span>
+    </label>
+    <label class="radio-row">
+      <input type="radio" name="format" value="decimal" id="fmt-decimal">
+      <span>Always decimal</span>
+    </label>
+    <label class="radio-row">
+      <input type="radio" name="format" value="fraction" id="fmt-fraction">
+      <span>Always fraction</span>
+    </label>
+  </div>
+
+  <div class="section hint-box">
+    <p>Type <kbd>=</kbd> after a math expression inside <code>$...$</code>, <code>\[...\]</code>, or <code>\(...\)</code>.</p>
+    <p>Press <kbd>Tab</kbd> to accept · <kbd>Esc</kbd> to dismiss.</p>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

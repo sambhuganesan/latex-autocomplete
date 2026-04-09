@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "LaTeX Auto-Compute",
+  "version": "1.0.0",
+  "description": "Computes LaTeX math expressions inline as you type — press = to trigger, Tab to accept.",
+  "permissions": ["storage"],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "LaTeX Auto-Compute Settings",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "src/settings.js",
+        "src/parser.js",
+        "src/compute.js",
+        "src/ghost.js",
+        "src/content.js"
+      ],
+      "css": ["styles/ghost.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["styles/ghost.css"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

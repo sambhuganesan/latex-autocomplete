@@ -1,7 +1,4 @@
 // ghost.js — ghost text overlay UI
-//
-// Creates a fixed-position overlay div that shows the computed result
-// as "ghost text" immediately after the cursor.
 
 const LatexGhost = (() => {
   let overlayEl = null;
@@ -26,14 +23,12 @@ const LatexGhost = (() => {
   // Cursor position detection
   // ---------------------------------------------------------------------------
 
-  // For CodeMirror 6: locate .cm-cursor element position
   function getCM6CursorRect() {
     const cursor = document.querySelector('.cm-cursor');
     if (!cursor) return null;
     return cursor.getBoundingClientRect();
   }
 
-  // For contenteditable: use the Selection API
   function getContenteditableCursorRect() {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return null;
@@ -41,7 +36,6 @@ const LatexGhost = (() => {
     range.collapse(true);
     const rects = range.getClientRects();
     if (rects.length === 0) {
-      // Fallback: use the bounding rect of the range container
       const container = range.startContainer;
       if (container.nodeType === Node.ELEMENT_NODE) {
         return container.getBoundingClientRect();
@@ -51,7 +45,6 @@ const LatexGhost = (() => {
     return rects[rects.length - 1];
   }
 
-  // For textarea elements: mirror-div technique
   function getTextareaCursorRect(textarea) {
     const pos = textarea.selectionEnd;
     const computed = window.getComputedStyle(textarea);
@@ -79,46 +72,32 @@ const LatexGhost = (() => {
     mirror.textContent = textBefore;
 
     const markerSpan = document.createElement('span');
-    markerSpan.textContent = '\u200B'; // zero-width space as cursor marker
+    markerSpan.textContent = '\u200B';
     mirror.appendChild(markerSpan);
-
     document.body.appendChild(mirror);
 
     const textareaRect = textarea.getBoundingClientRect();
     const mirrorRect = mirror.getBoundingClientRect();
     const spanRect = markerSpan.getBoundingClientRect();
 
-    // Offset from mirror's top-left to the span
     const relLeft = spanRect.left - mirrorRect.left;
     const relTop  = spanRect.top  - mirrorRect.top;
 
     document.body.removeChild(mirror);
 
     return {
-      left: textareaRect.left + relLeft - textarea.scrollLeft + textarea.clientLeft,
-      top:  textareaRect.top  + relTop  - textarea.scrollTop  + textarea.clientTop,
-      right: textareaRect.left + relLeft - textarea.scrollLeft + textarea.clientLeft,
-      bottom: textareaRect.top + relTop - textarea.scrollTop + textarea.clientTop + parseInt(computed.lineHeight || '16'),
+      left:   textareaRect.left + relLeft - textarea.scrollLeft + textarea.clientLeft,
+      top:    textareaRect.top  + relTop  - textarea.scrollTop  + textarea.clientTop,
+      right:  textareaRect.left + relLeft - textarea.scrollLeft + textarea.clientLeft,
       height: parseInt(computed.lineHeight || '16'),
     };
   }
 
   function getCursorRect(editorEl) {
     if (!editorEl) return null;
-
-    // Textarea — must check before contenteditable (textarea is not contenteditable)
-    if (editorEl.tagName === 'TEXTAREA') {
-      return getTextareaCursorRect(editorEl);
-    }
-    // CodeMirror 6 — .cm-content element passed directly
-    if (editorEl.classList && editorEl.classList.contains('cm-content')) {
-      return getCM6CursorRect();
-    }
-    // Contenteditable (Google Docs, HackMD, etc.)
-    if (editorEl.isContentEditable) {
-      return getContenteditableCursorRect();
-    }
-
+    if (editorEl.tagName === 'TEXTAREA') return getTextareaCursorRect(editorEl);
+    if (editorEl.classList && editorEl.classList.contains('cm-content')) return getCM6CursorRect();
+    if (editorEl.isContentEditable) return getContenteditableCursorRect();
     return null;
   }
 
@@ -135,9 +114,8 @@ const LatexGhost = (() => {
     el.textContent = text + hint;
   }
 
-  // forms: string[]  — array of representations, most-exact first
   function show(forms, editorEl, onAccept, onDismiss) {
-    dismiss(); // clear any existing ghost
+    dismiss();
 
     if (!forms || forms.length === 0) return;
     const rect = getCursorRect(editorEl);
@@ -150,20 +128,12 @@ const LatexGhost = (() => {
     formIndex       = 0;
 
     const el = getOrCreateOverlay();
-    // 6px gap so ghost doesn't sit flush against the cursor / = sign
-    el.style.left       = ((rect.right ?? (rect.left + (rect.width || 0))) + 6) + 'px';
-    el.style.top        = (rect.top ?? rect.y) + 'px';
+    el.style.left       = (rect.right ?? (rect.left + (rect.width || 0))) + 'px';
+    el.style.top        = (rect.top  ?? rect.y) + 'px';
     el.style.lineHeight = (rect.height || 20) + 'px';
-    // Match the editor font so ghost text is the same size
-    if (editorEl) {
-      const cs = window.getComputedStyle(editorEl);
-      el.style.fontSize   = cs.fontSize;
-      el.style.fontFamily = cs.fontFamily;
-    }
     el.classList.add('visible');
     updateOverlayText();
 
-    // Key handler — capture phase so we intercept before the editor
     keyHandler = (e) => {
       if (e.key === 'Tab') {
         e.preventDefault();
@@ -192,8 +162,7 @@ const LatexGhost = (() => {
         dismiss();
         if (cb) cb();
 
-      } else if (!['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) {
-        // Any other printable key → dismiss, let it through
+      } else if (!['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', ' '].includes(e.key)) {
         const cb = dismissCallback;
         dismiss();
         if (cb) cb();

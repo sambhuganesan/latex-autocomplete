@@ -222,39 +222,51 @@ function formatDecimal(value) {
 // Exact / irrational forms
 // ---------------------------------------------------------------------------
 
-// Known irrational bases to try expressing results as rational multiples of
+// Known irrational bases (no √6 — it's √2·√3, handled by pairs)
 const IRRATIONALS = [
-  { sym: '\\pi',         val: Math.PI },
-  { sym: '\\sqrt{2}',   val: Math.SQRT2 },
-  { sym: '\\sqrt{3}',   val: Math.sqrt(3) },
-  { sym: '\\sqrt{5}',   val: Math.sqrt(5) },
-  { sym: '\\sqrt{6}',   val: Math.sqrt(6) },
-  { sym: 'e',            val: Math.E },
+  { sym: '\\pi',       val: Math.PI },
+  { sym: '\\sqrt{2}', val: Math.SQRT2 },
+  { sym: '\\sqrt{3}', val: Math.sqrt(3) },
+  { sym: '\\sqrt{5}', val: Math.sqrt(5) },
+  { sym: 'e',          val: Math.E },
 ];
 
-// Format  (num/den) * sym  as LaTeX
-function fmtIrrational(num, den, sym) {
+// Format  (num/den) * syms  as LaTeX, syms is a string like '\sqrt{3}\pi'
+function fmtIrrational(num, den, syms) {
   const sign   = num < 0 ? '-' : '';
   const absNum = Math.abs(num);
-  if (absNum === 1 && den === 1) return `${sign}${sym}`;
-  if (absNum !== 1 && den === 1) return `${sign}${absNum}${sym}`;
-  if (absNum === 1 && den !== 1) return `${sign}\\frac{${sym}}{${den}}`;
-  return `${sign}\\frac{${absNum}${sym}}{${den}}`;
+  if (absNum === 1 && den === 1) return `${sign}${syms}`;
+  if (absNum !== 1 && den === 1) return `${sign}${absNum}${syms}`;
+  if (absNum === 1 && den !== 1) return `${sign}\\frac{${syms}}{${den}}`;
+  return `${sign}\\frac{${absNum}${syms}}{${den}}`;
 }
 
-// Try to express value as (p/q) * irrational, returns LaTeX string or null.
-// maxDen: max denominator to try; keep small (≤ 24) to avoid false matches.
+// Try to express value as (p/q) * irrational(s), returns LaTeX string or null.
+// Tries single irrationals first, then pairs (e.g. √3·π).
 function exactForm(value, maxDen = 24) {
   if (!isFinite(value) || value === 0) return null;
 
+  // Single irrational: value = (p/q) * irr
   for (const { sym, val } of IRRATIONALS) {
-    const ratio = value / val;
-    const f = toFraction(ratio, maxDen);
+    const f = toFraction(value / val, maxDen);
     if (!f) continue;
-    // Sanity: verify the round-trip is accurate
     if (Math.abs(f.num / f.den * val - value) > Math.abs(value) * 1e-8) continue;
     return fmtIrrational(f.num, f.den, sym);
   }
+
+  // Pair of irrationals: value = (p/q) * irr1 * irr2
+  for (let i = 0; i < IRRATIONALS.length; i++) {
+    for (let j = i + 1; j < IRRATIONALS.length; j++) {
+      const { sym: s1, val: v1 } = IRRATIONALS[i];
+      const { sym: s2, val: v2 } = IRRATIONALS[j];
+      const combined = v1 * v2;
+      const f = toFraction(value / combined, maxDen);
+      if (!f) continue;
+      if (Math.abs(f.num / f.den * combined - value) > Math.abs(value) * 1e-8) continue;
+      return fmtIrrational(f.num, f.den, s1 + s2);
+    }
+  }
+
   return null;
 }
 

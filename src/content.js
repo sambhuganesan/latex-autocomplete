@@ -16,8 +16,8 @@
   // This works for CM6 (Overleaf), Google Docs iframe, and any other editor.
   // ---------------------------------------------------------------------------
 
-  let _buf  = null;  // null = outside math; string = content since delimiter
-  let _prev = '';    // previous key, for two-char delimiters (\[  \(  $$)
+  let _buf  = null; // null = outside math; string = content since delimiter
+  let _prev = '';   // previous key, for two-char delimiters (\[  \(  $$)
 
   function bufReset() { _buf = null; _prev = ''; }
 
@@ -37,7 +37,7 @@
 
     // ── Inside a math environment ─────────────────────────────────────────────
     if (_buf !== null) {
-      if (key === '$') { bufReset(); return; }                                           // closing $
+      if (key === '$') { bufReset(); return; }                                              // closing $
       if (key === ']' && _prev === '\\') { _buf = _buf.slice(0, -1); bufReset(); return; } // \]
       if (key === ')' && _prev === '\\') { _buf = _buf.slice(0, -1); bufReset(); return; } // \)
       _buf += key;
@@ -47,7 +47,7 @@
 
     // ── Outside math — watch for opening delimiters ───────────────────────────
     if (key === '$') {
-      if (_prev === '$') { _buf = ''; _prev = ''; }   // $$ opener
+      if (_prev === '$') { _buf = ''; _prev = ''; }  // $$ opener
       else               { _prev = '$'; }              // single $ or first of $$
       return;
     }
@@ -201,15 +201,16 @@
   function showResult(mathExpr, target) {
     LOG('expr:', mathExpr);
     const result = computeLatex(mathExpr, _format);
-    if (!result.success) { LOG('compute failed:', result.error); return; }
+    if (!result.success) { LOG('compute failed:', result.error); return false; }
     const forms = getAllFormats(result.value);
-    if (!forms.length) return;
+    if (!forms.length) return false;
     LOG('showing:', forms);
     LatexGhost.show(
       forms, target,
       (text) => { bufReset(); insertAtCursor(target, text); },
       ()     => { bufReset(); }
     );
+    return true;
   }
 
   // ---------------------------------------------------------------------------
@@ -224,14 +225,25 @@
     }
 
     if (!_enabled || e.key !== '=' || LatexGhost.isVisible()) return;
-    if (_buf === null) return; // not inside a math delimiter — nothing to compute
-
-    const expr = _buf.slice(0, -1).trim(); // strip the trailing '=' we just added
-    if (!expr) return;
 
     const target = resolveTarget();
-    LOG('buffer expr:', expr, '| target:', target?.tagName, target?.className?.slice(0, 30));
-    requestAnimationFrame(() => showResult(expr, target));
+    const bufExpr = _buf !== null ? _buf.slice(0, -1).trim() : null;
+
+    requestAnimationFrame(() => {
+      // Try buffer first — fast, no DOM needed
+      if (bufExpr) {
+        LOG('buffer expr:', bufExpr);
+        if (showResult(bufExpr, target)) return;
+        LOG('buffer compute failed, trying DOM fallback');
+      }
+      // DOM fallback — handles mismatches from auto-paired braces/delimiters
+      const text = getTextBeforeCursor(target);
+      if (!text || !text.trimEnd().endsWith('=')) return;
+      const expr = extractMathBeforeEquals(text);
+      if (!expr) { LOG('no math found'); return; }
+      LOG('DOM expr:', expr);
+      showResult(expr, target);
+    });
 
   }, { capture: true });
 

@@ -134,3 +134,4 @@ Pull requests are welcome. A few things to know:
 ## License
 
 MIT
+"# latex-autocomplete" 

@@ -4,7 +4,7 @@
   /* Hidden by default; shown via .visible class */
   display: none;
 
-  position: absolute;
+  position: fixed;
   z-index: 2147483647; /* max z-index */
   pointer-events: none;
   user-select: none;

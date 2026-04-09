@@ -106,19 +106,15 @@ const LatexGhost = (() => {
   function getCursorRect(editorEl) {
     if (!editorEl) return null;
 
-    // CodeMirror 6
-    if (editorEl.classList && editorEl.classList.contains('cm-content')) {
-      return getCM6CursorRect();
-    }
-    // Overleaf / any CM editor ancestor
-    if (document.querySelector('.cm-editor')) {
-      return getCM6CursorRect();
-    }
-    // Textarea
+    // Textarea — must check before contenteditable (textarea is not contenteditable)
     if (editorEl.tagName === 'TEXTAREA') {
       return getTextareaCursorRect(editorEl);
     }
-    // Contenteditable
+    // CodeMirror 6 — .cm-content element passed directly
+    if (editorEl.classList && editorEl.classList.contains('cm-content')) {
+      return getCM6CursorRect();
+    }
+    // Contenteditable (Google Docs, HackMD, etc.)
     if (editorEl.isContentEditable) {
       return getContenteditableCursorRect();
     }
@@ -154,9 +150,16 @@ const LatexGhost = (() => {
     formIndex       = 0;
 
     const el = getOrCreateOverlay();
-    el.style.left       = (rect.right ?? (rect.left + (rect.width || 0))) + window.scrollX + 'px';
-    el.style.top        = (rect.top ?? rect.y) + window.scrollY + 'px';
+    // 6px gap so ghost doesn't sit flush against the cursor / = sign
+    el.style.left       = ((rect.right ?? (rect.left + (rect.width || 0))) + 6) + 'px';
+    el.style.top        = (rect.top ?? rect.y) + 'px';
     el.style.lineHeight = (rect.height || 20) + 'px';
+    // Match the editor font so ghost text is the same size
+    if (editorEl) {
+      const cs = window.getComputedStyle(editorEl);
+      el.style.fontSize   = cs.fontSize;
+      el.style.fontFamily = cs.fontFamily;
+    }
     el.classList.add('visible');
     updateOverlayText();
 

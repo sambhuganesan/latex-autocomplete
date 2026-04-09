@@ -23,7 +23,8 @@
         "src/content.js"
       ],
       "css": ["styles/ghost.css"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
   "web_accessible_resources": [
